@@ -1,0 +1,23 @@
+name: consumer-v2
+spec:
+  # Labels applied to the sandbox resource
+  labels:
+    demo: rabbitmq
+    signadot.com/sandbox: consumer-v2
+  cluster: "@{cluster}"
+  forks:
+  - forkOf:
+      kind: Deployment
+      namespace: rabbitmq-demo
+      name: consumer
+    customizations:
+      # Set an environment variable on the consumer container so it knows its sandbox name
+      env:
+        - container: consumer   # name of the container in your deployment
+          name: SANDBOX_NAME
+          value: consumer-v2
+  defaultRouteGroup:
+    endpoints:
+    - name: consumer-health
+      target: http://consumer.rabbitmq-demo.svc:8081
+

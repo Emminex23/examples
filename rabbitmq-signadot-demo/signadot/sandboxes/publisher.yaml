@@ -1,0 +1,22 @@
+name: publisher-v2
+spec:
+  # Labels applied to the sandbox resource (these can be used by RouteGroups)
+  labels:
+    demo: rabbitmq
+    version: "v2"
+    signadot.com/sandbox: publisher-v2
+  cluster: "@{cluster}"
+  forks:
+  - forkOf:
+      kind: Deployment
+      namespace: rabbitmq-demo
+      name: publisher
+    customizations:
+      images:
+        - container: publisher        # name of the container in your deployment
+          image: ghcr.io/emminex23/rabbitmq-publisher:dev
+  defaultRouteGroup:
+    endpoints:
+    - name: publisher
+      target: http://publisher.rabbitmq-demo.svc:8080
+
