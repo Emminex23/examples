@@ -10,37 +10,27 @@ spec:
       app: publisher
   template:
     metadata:
-      labels:
-        app: publisher
       annotations:
         sidecar.signadot.com/inject: "true"
+      labels:
+        app: publisher
     spec:
       containers:
       - name: publisher
         image: ghcr.io/emminex23/rabbitmq-publisher:latest
         ports:
         - containerPort: 8080
-          name: http
         env:
         - name: RABBITMQ_HOST
-          value: "rabbitmq"
+          value: rabbitmq
+        - name: RABBITMQ_PORT
+          value: "5672"
         - name: REDIS_HOST
-          value: "redis"
-        - name: EXCHANGE_NAME
-          value: "demo-direct"
-        resources:
-          requests:
-            memory: "128Mi"
-            cpu: "50m"
-          limits:
-            memory: "256Mi"
-            cpu: "200m"
-        readinessProbe:
-          httpGet:
-            path: /health
-            port: 8080
-          initialDelaySeconds: 10
-          periodSeconds: 5
+          value: redis
+        - name: REDIS_PORT
+          value: "6379"
+        # SIGNADOT_SANDBOX_NAME and SIGNADOT_SANDBOX_ROUTING_KEY
+        # are automatically injected by Signadot for sandboxed workloads
 ---
 apiVersion: v1
 kind: Service
@@ -53,4 +43,3 @@ spec:
   ports:
   - port: 8080
     targetPort: 8080
-    name: http
