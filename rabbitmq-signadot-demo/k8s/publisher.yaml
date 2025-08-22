@@ -18,6 +18,7 @@ spec:
       containers:
       - name: publisher
         image: ghcr.io/emminex23/rabbitmq-publisher:latest
+        imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 8080
         env:
@@ -29,8 +30,6 @@ spec:
           value: redis
         - name: REDIS_PORT
           value: "6379"
-        # SIGNADOT_SANDBOX_NAME and SIGNADOT_SANDBOX_ROUTING_KEY
-        # are automatically injected by Signadot for sandboxed workloads
 ---
 apiVersion: v1
 kind: Service

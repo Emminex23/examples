@@ -1,6 +1,5 @@
 name: consumer-v2
 spec:
-  # Labels applied to the sandbox resource
   labels:
     demo: rabbitmq
     signadot.com/sandbox: consumer-v2
@@ -10,14 +9,8 @@ spec:
       kind: Deployment
       namespace: rabbitmq-demo
       name: consumer
-    customizations:
-      # Set an environment variable on the consumer container so it knows its sandbox name
-      env:
-        - container: consumer   # name of the container in your deployment
-          name: SANDBOX_NAME
-          value: consumer-v2
+    # No custom env required; SIGNADOT_SANDBOX_* is injected automatically
   defaultRouteGroup:
     endpoints:
-    - name: consumer-health
-      target: http://consumer.rabbitmq-demo.svc:8081
-
+    - name: publisher
+      target: http://publisher.rabbitmq-demo.svc:8080

@@ -18,33 +18,29 @@ spec:
       containers:
       - name: consumer
         image: ghcr.io/emminex23/rabbitmq-consumer:latest
+        imagePullPolicy: IfNotPresent
         env:
-          # RabbitMQ connection
-          - name: RABBITMQ_HOST
-            value: rabbitmq
-          - name: RABBITMQ_PORT
-            value: "5672"
+        - name: RABBITMQ_HOST
+          value: rabbitmq
+        - name: RABBITMQ_PORT
+          value: "5672"
 
-          # Queue configuration
-          - name: QUEUE_NAME
-            value: "consumer-baseline"
-          - name: QUEUE_DURABLE
-            value: "true"
-          - name: QUEUE_AUTO_DELETE
-            value: "false"
+        # Queue configuration (baseline)
+        - name: QUEUE_NAME
+          value: "consumer-baseline"
+        - name: QUEUE_DURABLE
+          value: "true"
+        - name: QUEUE_AUTO_DELETE
+          value: "false"
 
-          # RouteServer config (baseline workload identifiers)
-          - name: ROUTESERVER_URL
-            value: "http://routeserver.signadot.svc:7778"
-          - name: BASELINE_KIND
-            value: "Deployment"
-          - name: BASELINE_NAMESPACE
-            valueFrom:
-              fieldRef:
-                fieldPath: metadata.namespace
-          - name: BASELINE_NAME
-            value: "consumer"
-
-          # These are automatically injected by Signadot into sandboxed workloads
-          # - name: SIGNADOT_SANDBOX_NAME
-          # - name: SIGNADOT_SANDBOX_ROUTING_KEY
+        # RouteServer config (baseline workload identifiers)
+        - name: ROUTESERVER_URL
+          value: "http://routeserver.signadot.svc:7778"
+        - name: BASELINE_KIND
+          value: "Deployment"
+        - name: BASELINE_NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+        - name: BASELINE_NAME
+          value: "consumer"

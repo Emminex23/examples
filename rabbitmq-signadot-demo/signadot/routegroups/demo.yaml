@@ -3,16 +3,10 @@ spec:
   cluster: "@{cluster}"
   description: "Route group for the RabbitMQ message-isolation demo"
   match:
-    # Include any sandbox whose 'demo' label is set to 'rabbitmq'
     any:
       - label:
           key: demo
           value: rabbitmq
   endpoints:
-    # Hosted URL for the publisher service
     - name: publisher
       target: http://publisher.rabbitmq-demo.svc:8080
-    # Hosted URL for the consumer health endpoint (optional)
-    - name: consumer-health
-      target: http://consumer.rabbitmq-demo.svc:8081
-
