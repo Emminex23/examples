@@ -188,7 +188,7 @@ kubectl logs -l app=consumer -n rabbitmq-demo --tail=50 | grep PROCESSING
 
 You should see baseline processing.
 
-![Screenshot 2025-08-22 at 4.14.13 PM.png](Testing%20Microservices%20with%20RabbitMQ%20using%20Signadot%202451d00b92d481bf9efdce27a1dc7a70/Screenshot_2025-08-22_at_4.14.13_PM.png)
+![Processing baseline](./images/img-001.png)
 
 ## Step 4 — Create sandboxes and a RouteGroup
 
@@ -218,7 +218,7 @@ curl -X POST http://publisher.rabbitmq-demo.svc:8080/publish \
   -d '{"order_id":"002","amount":200,"message":"Baseline order"}'
 ```
 
-![Screenshot 2025-08-22 at 4.17.07 PM.png](Testing%20Microservices%20with%20RabbitMQ%20using%20Signadot%202451d00b92d481bf9efdce27a1dc7a70/Screenshot_2025-08-22_at_4.17.07_PM.png)
+![Baseline order](./images/img-002.png)
 
 Sandbox message (explicit header → sandbox handles it):
 
@@ -232,8 +232,7 @@ curl -X POST http://publisher.rabbitmq-demo.svc:8080/publish \
   -d '{"order_id":"003","amount":300,"message":"Sandbox order"}'
 ```
 
-![Screenshot 2025-08-22 at 4.18.28 PM.png](Testing%20Microservices%20with%20RabbitMQ%20using%20Signadot%202451d00b92d481bf9efdce27a1dc7a70/Screenshot_2025-08-22_at_4.18.28_PM.png)
-
+![Routing key and sandbox order](./images/img-003.png)
 Watch logs side-by-side:
 
 - Baseline:
@@ -242,7 +241,7 @@ Watch logs side-by-side:
 kubectl logs -f -l app=consumer -n rabbitmq-demo | grep PROCESSING
 ```
 
-![Screenshot 2025-08-22 at 4.19.53 PM.png](Testing%20Microservices%20with%20RabbitMQ%20using%20Signadot%202451d00b92d481bf9efdce27a1dc7a70/Screenshot_2025-08-22_at_4.19.53_PM.png)
+![Baseline logs](./images/img-004.png)
 
 - Sandbox (replace name with your sandbox consumer deployment)
 
@@ -250,7 +249,7 @@ kubectl logs -f -l app=consumer -n rabbitmq-demo | grep PROCESSING
 kubectl logs -f deploy/consumer-v2-dep-consumer-xxxx -n rabbitmq-demo | grep PROCESSING
 ```
 
-![Screenshot 2025-08-22 at 4.20.31 PM.png](Testing%20Microservices%20with%20RabbitMQ%20using%20Signadot%202451d00b92d481bf9efdce27a1dc7a70/Screenshot_2025-08-22_at_4.20.31_PM.png)
+![Sandbox logs](./images/img-005.png)
 
 Expected outcome:
 
