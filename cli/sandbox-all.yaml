@@ -24,14 +24,6 @@ spec:
             value: "@{dev}" # environmental variable value.
           - name: VAR # a variable for the (implicit) main container.
             value: foo # environmental variable value.
-          - name: BACKEND_ADDR
-            valueFrom: # dynamic value, determined when the fork is created.
-              fork: # from a fork.
-                forkOf: # defines which fork (must exist in this sandbox).
-                  kind: Deployment # K8s kind (Deployment or ArgoRollout).
-                  namespace: "@{namespace}" # K8s namespace.
-                  name: backend # K8s name
-                expression: "{{.Service.Host}}:{{.Service.Port}}" # fork-creation-time expanded expression.
           - name: DBHOST # environmental variable name.
             valueFrom: # dynamic value, determined when the fork is created.
               resource: # value taken from sandbox resource

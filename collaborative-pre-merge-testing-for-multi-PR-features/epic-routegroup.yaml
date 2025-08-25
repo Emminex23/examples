@@ -1,0 +1,13 @@
+name: epic-42-preview
+spec:
+  cluster: testing-tw
+  match:
+    any:
+      - label:
+          key: epic
+          value: EPIC-42
+  endpoints:
+    - name: hotrod-frontend
+      target: http://frontend-surcharge-feature-dep-frontend-fcfd9a75.hotrod.svc:8080
+    - name: hotrod-route
+      target: http://route-surcharge-feature-dep-route-e2b10069.hotrod.svc:8083

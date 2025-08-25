@@ -1,0 +1,16 @@
+name: frontend-surcharge-feature
+spec:
+  cluster: testing-tw
+  labels:
+    epic: EPIC-42
+  forks:
+    - forkOf:
+        kind: Deployment
+        namespace: hotrod
+        name: frontend
+      customizations:
+        images:
+          - image: asruf/hotrod:epic-42
+        env:
+          - name: FRONTEND_ROUTE_ADDR
+            value: "route-surcharge-feature-dep-route-e2b10069.hotrod.svc:8083"

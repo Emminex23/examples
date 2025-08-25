@@ -1,0 +1,8 @@
+name: "${name}"
+spec:
+  cluster: "${cluster}"
+  match:
+    any:
+      - label:
+          key: epic
+          value: "${match_value}"

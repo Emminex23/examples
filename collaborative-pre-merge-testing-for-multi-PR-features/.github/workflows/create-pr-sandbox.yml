@@ -1,0 +1,57 @@
+name: Create PR Sandbox
+on:
+  pull_request:
+    types: [opened, synchronize]
+
+jobs:
+  create-sandbox:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: Build and push Docker image
+        run: |
+          cd hotrod
+          make build-frontend-app
+          make build-docker
+          docker tag signadot/hotrod:epic-42-surcharge-only-linux-amd64 asruf/hotrod:pr-${{ github.event.pull_request.number }}
+          docker push asruf/hotrod:pr-${{ github.event.pull_request.number }}
+
+      - name: Install Signadot CLI
+        run: curl -sSLf https://raw.githubusercontent.com/signadot/cli/main/scripts/install.sh | sh
+
+      - name: Create Sandbox YAML
+        run: |
+          cat > temp-sandbox.yaml << EOF
+          name: "pr-${{ github.event.pull_request.number }}"
+          spec:
+            cluster: "${{ secrets.SIGNADOT_CLUSTER }}"
+            labels:
+              github-pull-request: "${{ github.event.pull_request.number }}"
+              github-repo: "${{ github.repository }}"
+            forks:
+              - forkOf:
+                  kind: Deployment
+                  namespace: hotrod
+                  name: frontend
+                customizations:
+                  images:
+                    - image: "asruf/hotrod:pr-${{ github.event.pull_request.number }}"
+          EOF
+
+      - name: Apply Sandbox
+        env:
+          SIGNADOT_API_KEY: ${{ secrets.SIGNADOT_API_KEY }}
+          SIGNADOT_ORG: ${{ secrets.SIGNADOT_ORG }}
+        run: |
+          signadot sandbox apply -f temp-sandbox.yaml
