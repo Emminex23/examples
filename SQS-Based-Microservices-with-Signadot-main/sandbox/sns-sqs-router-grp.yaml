@@ -1,0 +1,9 @@
+name: sns-sqs-router-grp
+spec:
+  cluster: "@{cluster}"
+  description: "route group for testing multiple sandboxes together"
+  match:
+    any:
+    - label:
+        key: app
+        value: sns-sqs-fanout-sandbox

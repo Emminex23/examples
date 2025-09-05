@@ -1,0 +1,22 @@
+# AWS boto client
+boto3==1.39.14
+
+# HTTP client for Routes API
+aiohttp==3.9.0
+fastapi==0.116.1
+
+# py libraries
+python-multipart==0.0.20
+
+# otel SDK
+opentelemetry-api==1.36.0
+opentelemetry-sdk==1.36.0
+
+uvicorn==0.35.0
+
+# For loading environment variables from .env files
+python-dotenv
+
+httpx==0.28.1
+pydantic==2.11.7
+redis==6.2.0

@@ -1,0 +1,42 @@
+# Consumer Deployment
+# This deployment runs the SQS message consumer.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: consumer-deployment
+  namespace: aws-sqs-app
+  labels:
+    app: consumer  
+spec:
+  replicas: 1 # You can scale the number of consumer pods
+  selector:
+    matchLabels:
+      app: consumer
+  template:
+    metadata:
+      labels:
+        app: consumer
+      annotations:
+        sidecar.signadot.com/inject: "true"
+    spec:
+      containers:
+      - name: consumer
+        image: sqs-signadot:latest
+        imagePullPolicy: IfNotPresent
+        envFrom:
+          - configMapRef:
+              name: app-config
+          - secretRef:
+              name: aws-credentials
+        env:
+          - name: SIGNADOT_SANDBOX_NAME
+            value: ""
+          - name: ROUTES_API_ROUTE_SERVER_ADDR
+            value: "http://routeserver.signadot.svc:7778"
+          - name: BASELINE_NAME
+            value: "consumer-deployment"
+        command:
+          - "python"
+          - "-u" # for unbuffered stdout
+          - "main.py"
+          - "--consumer"

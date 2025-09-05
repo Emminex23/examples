@@ -1,0 +1,14 @@
+apiVersion: signadot.com/v1
+kind: Sandbox
+name: sqs-counsumer-sandbox
+spec:
+  labels:
+    app: "sns-sqs-fanout-sandbox"
+  description: Isolated sandbox environments to enable sqs messgae routing
+  cluster: "@{cluster}"
+  forks:
+  - forkOf:
+      kind: Deployment
+      name: consumer-deployment
+      namespace: aws-sqs-app
+         

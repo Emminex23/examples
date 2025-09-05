@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: app-config
+  namespace: aws-sqs-app
+data:
+  AWS_REGION: "us-east-1"
+  SQS_QUEUE_NAME: "sqs-signadot"
+  SNS_TOPIC_NAME: "sns-signadot"
+  BASELINE_NAMESPACE: "aws-sqs-app"
+  PRODUCER_HOST: "producer-service"
+  PRODUCER_PORT: "8000"

@@ -1,0 +1,17 @@
+apiVersion: signadot.com/v1
+kind: Sandbox
+name: sns-sqs-fanout-sandbox
+spec:
+  labels:
+    app: "sns-sqs-fanout-sandbox"
+  description: Isolated sandbox environments to enable sns to sqs fanout routing
+  cluster: "@{cluster}"
+  forks:
+  - forkOf:
+      kind: Deployment
+      name: producer-deployment
+      namespace: aws-sqs-app
+    customizations:
+      env:
+        - name: SNS_FANOUT_PUBLISH
+          value: "true"    

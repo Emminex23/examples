@@ -1,0 +1,60 @@
+# Producer Service
+# This service exposes the producer deployment to receive traffic.
+apiVersion: v1
+kind: Service
+metadata:
+  name: producer-service
+  namespace: aws-sqs-app
+spec:
+  selector:
+    app: producer
+  ports:
+    - protocol: TCP
+      port: 8000
+      targetPort: 8000
+  type: ClusterIP
+
+---
+
+# Producer Deployment
+# This deployment runs the FastAPI producer application.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: producer-deployment
+  namespace: aws-sqs-app
+  labels:
+    app: producer
+spec:
+  replicas: 1 # You can scale the number of producer pods
+  selector:
+    matchLabels:
+      app: producer
+  template:
+    metadata:
+      labels:
+        app: producer
+      annotations:
+        sidecar.signadot.com/inject: "true"
+    spec:
+      containers:
+      - name: producer
+        # Replace with your actual image repository and tag
+        image: sqs-signadot:latest
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 8000
+          name: http
+        envFrom:
+          - configMapRef:
+              name: app-config
+          - secretRef:
+              name: aws-credentials
+        env:
+          - name: BASELINE_NAME
+            value: "producer-deployment"
+        command:
+          - "python"
+          - "-u" # for unbuffered stdout
+          - "main.py"
+          - "--producer"     

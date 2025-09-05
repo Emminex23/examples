@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html>
+<meta charset="ISO-8859-1">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=0">
+
+<head>
+    <title>AWS SQS Demo</title>
+    <script src="https://code.jquery.com/jquery-3.7.1.min.js"
+        integrity="sha256-/JqT3SQfawRcv/BIHPThkBvs0OEvtFFmqPF/lYI/Cxo=" crossorigin="anonymous"></script>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet"
+        integrity="sha384-T3c6CoIi6uLrA9TneNEoa7RxnatzjcDSCmG1MXxSR1GAsXEV/Dwwykc2MPK8M2HN" crossorigin="anonymous">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"
+        integrity="sha384-C6RzsynM9kWDrMNeT87bh95OGNyZPhcTNXj1NW7RuBCsyN/o0jlpcV8Qyq46cDfL"
+        crossorigin="anonymous"></script>
+
+    <style>
+        .margintop {
+            margin-top: 15px;
+        }
+
+        .marginright {
+            margin-right: 15px;
+        }
+
+        .space {
+            margin: 0;
+            padding: 0;
+            height: 30px;
+        }
+
+        .button {
+            cursor: pointer;
+        }
+
+        .button:hover {
+            cursor: pointer;
+            filter: brightness(85%);
+        }
+
+        .consumer {
+            color: #4faaf9;
+        }
+
+        .producer {
+            color: #51b831;
+        }
+
+        .frontend {
+            color: #dd9d49;
+        }
+
+        .browser {
+            color: #c86ddc;
+        }
+
+        .log-group-header {
+            margin-bottom: 8px;
+            color: #768aad;
+            background-color: #f8f9fa;
+            padding: 6px 10px;
+            border-radius: 4px;
+            border: 1px solid #dee2e6;
+            font-size: 0.85em;
+        }
+
+        .log-group-entries {
+            margin-left: 15px;
+            margin-bottom: 12px;
+            padding: 6px 8px;
+            background-color: #ffffff;
+            border-radius: 4px;
+            border: 1px solid #e9ecef;
+            font-size: 0.8em;
+        }
+
+        .log-entry-row {
+            margin-bottom: 3px;
+            padding: 2px 0;
+        }
+
+        .log-time {
+            min-width: 70px;
+            font-size: 0.90em;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container text-center margintop">
+        <h1>AWS SQS Demo</h1>
+        <h4><em>Publish Messages On Demand</em></h4>
+        <p class="text-muted small mb-0">Add a message body, click "Publish" and see how it flows through the different
+            microservices.</p>
+        <div class="space"></div>
+
+        <div class="row justify-content-center">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="mb-0">AWS SQS Demo - Message Publisher</h5>
+                    </div>
+                    <div class="card-body">
+                        <!-- Log Entries and Architecture Row -->
+                        <div class="row">
+                            <div class="col-12 col-lg-7">
+                                <div class="card">
+                                    <div class="card-body p-2">
+                                        <!-- Message Publisher Form -->
+                                        <form class="row g-2 mb-3 text-start">
+                                            <div class="col-auto">
+                                                <label for="messageID" class="form-label fw-medium small mb-1">Message
+                                                    ID:</label>
+                                                <input type="text" disabled class="form-control form-control-sm"
+                                                    id="messageID" style="min-width: 100px;">
+                                            </div>
+                                            <div class="col">
+                                                <label for="messageBody" class="form-label fw-medium mb-1">Message
+                                                    Body:</label>
+                                                <input type="text" class="form-control" id="messageBody"
+                                                    placeholder="Enter your message...">
+                                            </div>
+                                            <div class="col-auto align-self-end">
+                                                <button id="publishMsg" type="submit"
+                                                    class="btn btn-primary button me-2">
+                                                    <i class="bi bi-send"></i> Publish
+                                                </button>
+                                                <button id="clearLog" type="submit"
+                                                    class="btn btn-outline-danger button">
+                                                    <i class="bi bi-trash"></i> Clear Log
+                                                </button>
+                                            </div>
+                                        </form>
+                                        <hr class="my-3">
+                                        <!-- Log entries header and container -->
+                                        <h6 class="mb-2 fw-medium">Log Entries</h6>
+                                        <div id="message-log" >
+                                            <!-- Log entries will be dynamically added here -->
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-12 col-lg-5">
+                                <div class="card">
+                                    <div class="card-header bg-light">
+                                        <h6 class="mb-0">Architecture</h6>
+                                    </div>
+                                    <div class="card-body text-center p-2">
+                                        <img src="/static/img/architecture.jpg"
+                                            class="img-fluid" />
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+</body>
+
+<script>
+    var clientUUID = Math.round(Math.random() * 10000);
+    var lastMessageID = 0;
+    var eventsCursor = 0;
+
+    // Use current URI as basepath for ajax requests
+    var pathPrefix = window.location.pathname;
+    pathPrefix = pathPrefix != "/" ? pathPrefix : '';
+
+    var headers = {
+        'baggage': 'session=' + clientUUID
+    };
+    updateMessageID();
+
+    // functions definition
+    // ------------------------------------------------------------------------
+
+    function updateMessageID() {
+        lastMessageID++;
+        $("#messageID").val(clientUUID + "-" + lastMessageID);
+    }
+
+    function logError(dt, text, context) {
+        if (context !== undefined && context.error !== undefined) {
+            text += '('+ context.error +')';
+        }
+        log(dt, text, "text-danger", context)
+    }
+
+    function logSuccess(dt, text, context) {
+        log(dt, text, "text-success", context)
+    }
+
+    function log(dt, text, color, context) {
+        if (context === undefined || context.message === undefined) {
+            return;
+        }
+        msgID = context.message.id
+
+        // Create the log group (if it doesn't exist)
+        if ($('#' + msgID).length == 0) {
+            $("#message-log").prepend(
+                '<div class="row" id="' + msgID + '">' +
+                '<div class="row">' +
+                '<div class="col log-group-header fw-medium text-start border-info-subtle border-bottom">' +
+                'Request Scope  >  msgID: ' + msgID + ', msgBody: "' + context.message.body + '", routingKey: <span id="' + msgID + '-rk">""</span>' +
+                '</div>' +
+                '</div>' +
+                ' <div class="row log-group-entries" style="width: 95% !important;" id="' + msgID + '-entries">' +
+                '<div/>' +
+                '</div>'
+            );
+        }
+
+        // Update routing key in group header (if any)
+        if (context.routingKey !== undefined && context.routingKey !== "") {
+            $('#' + msgID + '-rk').html(context.routingKey);
+        }
+
+        // Append the log entry
+        var time = String(dt.getHours()).padStart(2, '0') + ":" +
+            String(dt.getMinutes()).padStart(2, '0') + ":" +
+            String(dt.getSeconds()).padStart(2, '0') + "." +
+            String(dt.getMilliseconds()).padStart(3, '0');
+
+        var source = "browser"
+        var sourceColor = source
+        if (context.baselineWorkload !== undefined) {
+            source = context.baselineWorkload.name;
+            sourceColor = source
+        }
+        if (context.sandboxName !== undefined && context.sandboxName !== "") {
+            source += " (sandbox=" + context.sandboxName + ")"
+        } else if (source != "browser") {
+            source += " (baseline)"
+        }
+
+        $('#' + msgID + '-entries').prepend(
+            '<div class="row log-entry-row">' +
+            '<div class="col-auto text-end fw-bold log-time">' + time + '</div>' +
+            '<div class="col text-start">' +
+            '<span class="' + sourceColor + ' fw-bold marginright">' + source + '</span>' +
+            '<em class="' + color + ' fw-bold">' + text + '.</em>' +
+            '</div>' +
+            '</div>'
+        );
+    }
+
+    $("#publishMsg").click(function (evt) {
+        messageID = $('#messageID').val()
+        messageBody = $('#messageBody').val()
+
+        logSuccess(new Date(), 'Sending publish request to frontend API', {
+            message: {
+                id: messageID,
+                body: messageBody
+            },
+        })
+
+        $.ajax(pathPrefix + '/api/produce/?nonse=' + Math.random(), {
+            headers: headers,
+            method: 'POST',
+            contentType: 'application/json',
+            data: JSON.stringify({
+                id: messageID,
+                body: messageBody
+            }),
+            success: function (data, textStatus) {
+            },
+            error: function (xhr, status, error) {
+                if (xhr.responseText) {
+                    error += " (" + xhr.responseText + ")"
+                }
+                logError(new Date(), 'Error sending request to frontend API', {
+                    message: {
+                        id: messageID,
+                        body: messageBody
+                    },
+                    error: error,
+                })
+            }
+        });
+
+        updateMessageID();
+        return false
+    });
+
+    $("#clearLog").click(function (evt) {
+        $("#message-log").html("");
+        return false
+    });
+
+    // Load events from the frontend API
+    var intervalId = setInterval(function () {
+        $.ajax(pathPrefix + '/api/events?cursor=' + eventsCursor + '&nonse=' + Math.random(), {
+            headers: headers,
+            method: 'GET',
+            success: function (data, textStatus) {
+                // update our cursor
+                if (data.cursor !== 0) {
+                    eventsCursor = data.cursor
+                }
+                // display log entries
+                data.events.forEach((element) => {
+                    console.log(element);                    
+                    logSuccess(new Date(element.timestamp), element.logEntry, element.context)
+                })
+            },
+            error: function (xhr, status, error) {
+                if (xhr.responseText) {
+                    error += " (" + xhr.responseText + ")"
+                }
+                logError(new Date(), 'Error loading events from frontend API', {
+                    error: error,
+                })
+            }
+        });
+    }, 2000);
+</script>
+</html>
