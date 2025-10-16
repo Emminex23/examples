@@ -3,7 +3,7 @@ set -e
 
 
 # Build demo images
-pushd ~/git/thrid-party/apollographql/supergraph-demo
+pushd ~/git/third-party/apollographql/supergraph-demo
 
 docker build -t signadot/apollographql-demo-products:latest ./subgraphs/products
 docker build -t signadot/apollographql-demo-inventory:latest ./subgraphs/inventory

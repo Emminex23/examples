@@ -1,7 +1,7 @@
 #!/bin/bash
 set -e
 
-cd ~/git/thrid-party/wundergraph/cosmo/demo
+cd ~/git/third-party/wundergraph/cosmo/demo
 
 # Create the federated graph
 wgc federated-graph create demo \

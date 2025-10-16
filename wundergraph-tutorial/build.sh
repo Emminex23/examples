@@ -1,7 +1,7 @@
 #!/bin/bash
 set -e
 
-cd ~/git/thrid-party/wundergraph/cosmo/demo
+cd ~/git/third-party/wundergraph/cosmo/demo
 
 # Build demo images
 docker build -t signadot/wundergraph-demo-products:latest -f ./docker/products.Dockerfile .

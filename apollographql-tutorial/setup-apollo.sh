@@ -1,7 +1,7 @@
 #!/bin/bash
 set -e
 
-cd ~/git/thrid-party/apollographql/supergraph-demo
+cd ~/git/third-party/apollographql/supergraph-demo
 
 # Create the products subgraph
 rover subgraph publish "${APOLLO_GRAPH_NAME}@${APOLLO_BASELINE_VARIANT}" \

@@ -31,8 +31,8 @@ cd ~/git/signadot/
 git clone https://github.com/signadot/examples.git
 
 # Clone the wundergraph/cosmo repo
-mkdir -p ~/git/thrid-party/wundergraph/
-cd ~/git/thrid-party/wundergraph/
+mkdir -p ~/git/third-party/wundergraph/
+cd ~/git/third-party/wundergraph/
 git clone https://github.com/wundergraph/cosmo.git
 
 # Build demo images

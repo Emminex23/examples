@@ -41,8 +41,8 @@ cd ~/git/signadot/
 git clone https://github.com/signadot/examples.git
 
 # Clone the apollographql/supergraph-demo repo
-mkdir -p ~/git/thrid-party/apollographql
-cd ~/git/thrid-party/apollographql
+mkdir -p ~/git/third-party/apollographql
+cd ~/git/third-party/apollographql
 git clone https://github.com/apollographql/supergraph-demo.git
 
 # Build demo images
