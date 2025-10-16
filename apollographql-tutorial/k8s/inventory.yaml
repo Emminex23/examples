@@ -1,0 +1,35 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: inventory
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      component: inventory
+  template:
+    metadata:
+      labels:
+        component: inventory
+      annotations:
+        sidecar.signadot.com/inject: "true"
+    spec:
+      containers:
+        - name: inventory
+          image: signadot/apollographql-demo-inventory:latest
+          imagePullPolicy: Never
+          ports:
+            - containerPort: 4000
+              name: graphql
+      restartPolicy: Always
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: inventory
+spec:
+  ports:
+    - name: graphql
+      port: 4000
+  selector:
+    component: inventory

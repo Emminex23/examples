@@ -1,0 +1,65 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: router
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      component: router
+  template:
+    metadata:
+      labels:
+        component: router
+      annotations:
+        sidecar.signadot.com/inject: "true"
+    spec:
+      restartPolicy: Always
+      containers:
+        - name: router
+          image: ghcr.io/apollographql/router:v2.7.0
+          ports:
+            - containerPort: 4000
+              name: graphql
+          env:
+            - name: APOLLO_ROUTER_CONFIG_PATH
+              value: /etc/router/router.yaml
+            - name: APOLLO_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: router
+                  key: APOLLO_KEY
+            - name: APOLLO_GRAPH_NAME
+              valueFrom:
+                secretKeyRef:
+                  name: router
+                  key: APOLLO_GRAPH_NAME
+            - name: APOLLO_GRAPH_VARIANT
+              valueFrom:
+                secretKeyRef:
+                  name: router
+                  key: APOLLO_BASELINE_VARIANT
+            - name: APOLLO_GRAPH_REF
+              value: "$(APOLLO_GRAPH_NAME)@$(APOLLO_GRAPH_VARIANT)"
+            - name: APOLLO_ROUTER_LISTEN_ADDRESS
+              value: "0.0.0.0:4000"
+            - name: APOLLO_TELEMETRY_DISABLED
+              value: "true"
+          volumeMounts:
+          - name: router-config
+            mountPath: /etc/router
+      volumes:
+      - name: router-config
+        configMap:
+          name: router
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: router
+spec:
+  ports:
+    - name: graphql
+      port: 4000
+  selector:
+    component: router

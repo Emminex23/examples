@@ -1,0 +1,35 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: users
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      component: users
+  template:
+    metadata:
+      labels:
+        component: users
+      annotations:
+        sidecar.signadot.com/inject: "true"
+    spec:
+      containers:
+        - name: users
+          image: signadot/apollographql-demo-users:latest
+          imagePullPolicy: Never
+          ports:
+            - containerPort: 4000
+              name: graphql
+      restartPolicy: Always
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: users
+spec:
+  ports:
+    - name: graphql
+      port: 4000
+  selector:
+    component: users

@@ -1,0 +1,25 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: router
+data:
+  router.yaml: |
+    # Enable context propagation
+    headers:
+      all:
+        request:
+          - propagate:
+              named: "baggage"
+          - propagate:
+              named: "traceparent"
+
+    # Enable graphql sandbox
+    sandbox:
+      enabled: true
+    # Sandbox uses introspection to obtain your router's schema.
+    supergraph:
+      introspection: true
+    # Sandbox requires the default landing page to be disabled.
+    homepage:
+      enabled: false
+

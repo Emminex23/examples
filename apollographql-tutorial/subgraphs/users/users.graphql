@@ -1,0 +1,11 @@
+type User @key(fields:"email") {
+    email:ID!
+    name: String
+    phoneNumber: String
+    totalProductsCreated: Int
+}
+
+extend type Query {
+  allUsers: [User]
+  user(email: ID!): User
+}
