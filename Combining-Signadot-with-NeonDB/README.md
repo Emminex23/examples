@@ -174,7 +174,7 @@ metadata:
   namespace: default
 type: Opaque
 stringData:
-  DATABASE_URL: "postgresql://neondb_owner:npg_w96GqDPdoVCc@ep-ancient-sunset-ahaw7ysn-pooler.c-3.us-east-1.aws.neon.tech/appdb?sslmode=require&channel_binding=require"
+  DATABASE_URL: "postgresql://username:password@ep-ancient-sunset-ahaw7ysn-pooler.c-3.us-east-1.aws.neon.tech/appdb?sslmode=require&channel_binding=require"
 
 ```
 
@@ -217,7 +217,7 @@ In a separate terminal, test the endpoints:
 
 ```bash
 # Health check
-curl <http://localhost:3000/health>
+curl http://localhost:3000/health
 
 ```
 
@@ -225,7 +225,7 @@ curl <http://localhost:3000/health>
 
 ```bash
 # List users
-curl <http://localhost:3000/users>
+curl http://localhost:3000/users
 
 ```
 
@@ -245,8 +245,8 @@ A Signadot Resource Plugin is the "glue" that connects Signadot to Neon. You nee
 The Resource Plugin runner needs access to your Neon API key. You store it in a Kubernetes Secret so the runner pod can authenticate with the Neon API.
 
 ```bash
-kubectl create secret generic neon-api-credentials \\
-    --namespace=default \\
+kubectl create secret generic neon-api-credentials \
+    --namespace=default \
     --from-literal=NEON_API_KEY=your-neon-api-key-here
 
 ```
@@ -336,10 +336,10 @@ spec:
         echo "Parent branch: ${PARENT_BRANCH}"
 
         # Create the branch
-        neonctl branches create \\
-          --project-id "${NEON_PROJECT_ID}" \\
-          --name "${BRANCH_NAME}" \\
-          --parent "${PARENT_BRANCH}" \\
+        neonctl branches create \
+          --project-id "${NEON_PROJECT_ID}" \
+          --name "${BRANCH_NAME}" \
+          --parent "${PARENT_BRANCH}" \
           --output json > /tmp/branch-output.json
 
         cat /tmp/branch-output.json
@@ -349,16 +349,16 @@ spec:
         echo "Created branch ID: ${BRANCH_ID}"
 
         # Get the connection string for the new branch
-        CONNECTION_STRING=$(neonctl connection-string "${BRANCH_NAME}" \\
-          --project-id "${NEON_PROJECT_ID}" \\
+        CONNECTION_STRING=$(neonctl connection-string "${BRANCH_NAME}" \
+          --project-id "${NEON_PROJECT_ID}" \
           --database-name "${DATABASE_NAME}")
 
         echo "Connection string retrieved successfully"
 
         # Create a Kubernetes Secret with the connection string
         echo "Creating Kubernetes Secret: ${SECRET_NAME} in namespace ${TARGET_NAMESPACE}"
-        kubectl create secret generic "${SECRET_NAME}" \\
-          --namespace="${TARGET_NAMESPACE}" \\
+        kubectl create secret generic "${SECRET_NAME}" \
+          --namespace="${TARGET_NAMESPACE}" \
           --from-literal=DATABASE_URL="${CONNECTION_STRING}"
 
         echo "Kubernetes Secret created successfully"
@@ -428,7 +428,7 @@ spec:
         kubectl delete secret "${SECRET_NAME}" --namespace="${TARGET_NAMESPACE}" --ignore-not-found=true
 
         echo "Deleting Neon branch: ${BRANCH_NAME}"
-        neonctl branches delete "${BRANCH_NAME}" \\
+        neonctl branches delete "${BRANCH_NAME}" \
           --project-id "${NEON_PROJECT_ID}"
 
         echo "Cleanup complete"
@@ -607,9 +607,9 @@ signadot cluster list
 Apply the sandbox specification with your specific values:
 
 ```bash
-signadot sandbox apply -f users-sandbox.yaml \\
-  --set sandbox-name=featureuserexport \\
-  --set cluster=test-cluster \\
+signadot sandbox apply -f users-sandbox.yaml \
+  --set sandbox-name=featureuserexport \
+  --set cluster=test-cluster \
   --set neon-project-id=crimson-voice-12345678
 
 ```
@@ -671,7 +671,7 @@ A new Secret named `dbcredsfeatureuserexport` has been created. The naming conve
 The `DATABASE_URL` value is base64-encoded. Decode it to see the connection string:
 
 ```bash
-kubectl get secret dbcredsfeatureuserexport -n default \\
+kubectl get secret dbcredsfeatureuserexport -n default \
   -o jsonpath='{.data.DATABASE_URL}' | base64 --decode
 
 ```
@@ -687,7 +687,7 @@ The Secret contains the connection string for the sandbox branch endpoint (`ep-a
 Compare with the baseline Secret:
 
 ```bash
-kubectl get secret users-db-credentials -n default \\
+kubectl get secret users-db-credentials -n default \
   -o jsonpath='{.data.DATABASE_URL}' | base64 --decode
 
 ```
@@ -705,7 +705,7 @@ The sandbox branch inherits all data from its parent. Verify this by querying th
 Get your Signadot API key and query the sandbox endpoint:
 
 ```bash
-curl -H "signadot-api-key: your-signadot-api-key" \\
+curl -H "signadot-api-key: your-signadot-api-key" \
   "<https://users-api--featureuserexport.preview.signadot.com/users>"
 
 ```
@@ -720,10 +720,10 @@ The three users from the main branch appear in the sandbox. The copy-on-write br
 Create a new user that exists only in the sandbox branch:
 
 ```bash
-curl -X POST \\
-  -H "signadot-api-key: your-signadot-api-key" \\
-  -H "Content-Type: application/json" \\
-  -d '{"name": "Sandbox User", "email": "sandbox@test.example"}' \\
+curl -X POST \
+  -H "signadot-api-key: your-signadot-api-key" \
+  -H "Content-Type: application/json" \
+  -d '{"name": "Sandbox User", "email": "sandbox@test.example"}' \
   "<https://users-api--featureuserexport.preview.signadot.com/users>"
 
 ```
@@ -734,7 +734,7 @@ Output:
 Query the sandbox again:
 
 ```bash
-curl -H "signadot-api-key: your-signadot-api-key" \\
+curl -H "signadot-api-key: your-signadot-api-key" \
   "<https://users-api--featureuserexport.preview.signadot.com/users>"
 
 ```
@@ -751,8 +751,8 @@ Connect directly to the Neon branch using `psql` to confirm the data exists at t
 Get the sandbox branch connection string:
 
 ```bash
-neonctl connection-string sandboxfeatureuserexport \\
-  --project-id crimson-voice-12345678 \\
+neonctl connection-string sandboxfeatureuserexport \
+  --project-id crimson-voice-12345678 \
   --database-name appdb
 
 ```
@@ -789,8 +789,8 @@ The sandbox branch contains all four users, including the test user. Exit psql:
 Connect directly to the main branch and confirm it does NOT contain the sandbox test user. Get the main branch connection string:
 
 ```bash
-neonctl connection-string main \\
-  --project-id crimson-voice-12345678 \\
+neonctl connection-string main \
+  --project-id crimson-voice-12345678 \
   --database-name appdb
 
 ```
