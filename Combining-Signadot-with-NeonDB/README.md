@@ -314,11 +314,11 @@ spec:
         apt-get update && apt-get install -y curl ca-certificates gnupg
 
         # Install Node.js
-        curl -fsSL <https://deb.nodesource.com/setup_20.x> | bash -
+        curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
         apt-get install -y nodejs
 
         # Install kubectl
-        curl -LO "<https://dl.k8s.io/release/$>(curl -L -s <https://dl.k8s.io/release/stable.txt>)/bin/linux/amd64/kubectl"
+        curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
         chmod +x kubectl
         mv kubectl /usr/local/bin/
 
@@ -413,11 +413,11 @@ spec:
         apt-get update && apt-get install -y curl ca-certificates gnupg
 
         # Install Node.js
-        curl -fsSL <https://deb.nodesource.com/setup_20.x> | bash -
+        curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
         apt-get install -y nodejs
 
         # Install kubectl
-        curl -LO "<https://dl.k8s.io/release/$>(curl -L -s <https://dl.k8s.io/release/stable.txt>)/bin/linux/amd64/kubectl"
+        curl -LO "https://dl.k8s.io/release/$(curl -L -s <https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
         chmod +x kubectl
         mv kubectl /usr/local/bin/
 
@@ -571,7 +571,7 @@ spec:
   defaultRouteGroup:
     endpoints:
       - name: users-api
-        target: <http://users-service.default.svc:3000>
+        target: http://users-service.default.svc:3000
 
 ```
 
@@ -706,7 +706,7 @@ Get your Signadot API key and query the sandbox endpoint:
 
 ```bash
 curl -H "signadot-api-key: your-signadot-api-key" \
-  "<https://users-api--featureuserexport.preview.signadot.com/users>"
+  "https://users-api--featureuserexport.preview.signadot.com/users"
 
 ```
 
@@ -724,7 +724,7 @@ curl -X POST \
   -H "signadot-api-key: your-signadot-api-key" \
   -H "Content-Type: application/json" \
   -d '{"name": "Sandbox User", "email": "sandbox@test.example"}' \
-  "<https://users-api--featureuserexport.preview.signadot.com/users>"
+  "https://users-api--featureuserexport.preview.signadot.com/users"
 
 ```
 
@@ -735,7 +735,7 @@ Query the sandbox again:
 
 ```bash
 curl -H "signadot-api-key: your-signadot-api-key" \
-  "<https://users-api--featureuserexport.preview.signadot.com/users>"
+  "https://users-api--featureuserexport.preview.signadot.com/users"
 
 ```
 
