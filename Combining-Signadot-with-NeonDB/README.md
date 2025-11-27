@@ -780,7 +780,7 @@ Output:
 The sandbox branch contains all four users, including the test user. Exit psql:
 
 ```sql
-\\q
+\q
 
 ```
 
@@ -830,7 +830,7 @@ Zero rows. The main branch remains completely clean.
 Exit psql:
 
 ```sql
-\\q
+\q
 
 ```
 
