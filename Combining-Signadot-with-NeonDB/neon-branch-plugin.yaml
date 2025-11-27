@@ -1,0 +1,164 @@
+name: neon-branch
+spec:
+  description: Creates and deletes Neon database branches for sandbox isolation
+  
+  runner:
+    image: debian:bookworm-slim
+    namespace: default
+    podTemplateOverlay: |
+      spec:
+        serviceAccountName: neon-branch-plugin-sa
+        containers:
+          - name: main
+            env:
+              - name: NEON_API_KEY
+                valueFrom:
+                  secretKeyRef:
+                    name: neon-api-credentials
+                    key: NEON_API_KEY
+
+  create:
+    - name: createbranch
+      inputs:
+        - name: project-id
+          valueFromSandbox: true
+          as:
+            env: NEON_PROJECT_ID
+        - name: parent-branch
+          valueFromSandbox: true
+          as:
+            env: PARENT_BRANCH
+        - name: database-name
+          valueFromSandbox: true
+          as:
+            env: DATABASE_NAME
+        - name: namespace
+          valueFromSandbox: true
+          as:
+            env: TARGET_NAMESPACE
+      script: |
+        #!/bin/bash
+        set -e
+
+        # Install required packages
+        apt-get update && apt-get install -y curl ca-certificates gnupg
+
+        # Install Node.js
+        curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
+        apt-get install -y nodejs
+
+        # Install kubectl
+        curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+        chmod +x kubectl
+        mv kubectl /usr/local/bin/
+
+        # Install neonctl
+        npm install -g neonctl
+
+        # Generate a unique branch name and secret name using the sandbox name
+        # Remove any hyphens from sandbox name for Neon branch naming
+        SAFE_NAME=$(echo "${SIGNADOT_SANDBOX_NAME}" | tr -d '-')
+        BRANCH_NAME="sandbox${SAFE_NAME}"
+        SECRET_NAME="dbcreds${SAFE_NAME}"
+
+        echo "Creating Neon branch: ${BRANCH_NAME}"
+        echo "Project ID: ${NEON_PROJECT_ID}"
+        echo "Parent branch: ${PARENT_BRANCH}"
+
+        # Create the branch
+        neonctl branches create \
+          --project-id "${NEON_PROJECT_ID}" \
+          --name "${BRANCH_NAME}" \
+          --parent "${PARENT_BRANCH}" \
+          --output json > /tmp/branch-output.json
+
+        cat /tmp/branch-output.json
+
+        # Extract the branch ID
+        BRANCH_ID=$(cat /tmp/branch-output.json | grep -o '"id":"[^"]*"' | head -1 | cut -d'"' -f4)
+        echo "Created branch ID: ${BRANCH_ID}"
+
+        # Get the connection string for the new branch
+        CONNECTION_STRING=$(neonctl connection-string "${BRANCH_NAME}" \
+          --project-id "${NEON_PROJECT_ID}" \
+          --database-name "${DATABASE_NAME}")
+
+        echo "Connection string retrieved successfully"
+
+        # Create a Kubernetes Secret with the connection string
+        echo "Creating Kubernetes Secret: ${SECRET_NAME} in namespace ${TARGET_NAMESPACE}"
+        kubectl create secret generic "${SECRET_NAME}" \
+          --namespace="${TARGET_NAMESPACE}" \
+          --from-literal=DATABASE_URL="${CONNECTION_STRING}"
+
+        echo "Kubernetes Secret created successfully"
+
+        # Write outputs to files for Signadot to capture
+        mkdir -p /outputs
+        echo -n "${BRANCH_NAME}" > /outputs/branch-name
+        echo -n "${BRANCH_ID}" > /outputs/branch-id
+        echo -n "${SECRET_NAME}" > /outputs/secret-name
+        echo -n "${CONNECTION_STRING}" > /outputs/connection-string
+
+        echo "Branch creation complete"
+
+      outputs:
+        - name: branch-name
+          valueFromPath: /outputs/branch-name
+        - name: branch-id
+          valueFromPath: /outputs/branch-id
+        - name: secret-name
+          valueFromPath: /outputs/secret-name
+        - name: connection-string
+          valueFromPath: /outputs/connection-string
+
+  delete:
+    - name: deletebranch
+      inputs:
+        - name: project-id
+          valueFromSandbox: true
+          as:
+            env: NEON_PROJECT_ID
+        - name: namespace
+          valueFromSandbox: true
+          as:
+            env: TARGET_NAMESPACE
+        - name: branch-name
+          valueFromStep:
+            name: createbranch
+            output: branch-name
+          as:
+            env: BRANCH_NAME
+        - name: secret-name
+          valueFromStep:
+            name: createbranch
+            output: secret-name
+          as:
+            env: SECRET_NAME
+      script: |
+        #!/bin/bash
+        set -e
+
+        # Install required packages
+        apt-get update && apt-get install -y curl ca-certificates gnupg
+
+        # Install Node.js
+        curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
+        apt-get install -y nodejs
+
+        # Install kubectl
+        curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+        chmod +x kubectl
+        mv kubectl /usr/local/bin/
+
+        # Install neonctl
+        npm install -g neonctl
+
+        echo "Deleting Kubernetes Secret: ${SECRET_NAME}"
+        kubectl delete secret "${SECRET_NAME}" --namespace="${TARGET_NAMESPACE}" --ignore-not-found=true
+
+        echo "Deleting Neon branch: ${BRANCH_NAME}"
+        neonctl branches delete "${BRANCH_NAME}" \
+          --project-id "${NEON_PROJECT_ID}"
+
+        echo "Cleanup complete"
