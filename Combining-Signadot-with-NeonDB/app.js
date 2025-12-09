@@ -23,22 +23,29 @@ app.get('/health', async (req, res) => {
 
 // Get all users
 app.get('/users', async (req, res) => {
-  const result = await pool.query('SELECT * FROM users ORDER BY id');
-  res.json(result.rows);
+  try {
+    const result = await pool.query('SELECT * FROM users ORDER BY id');
+    res.json(result.rows);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // Create a user
 app.post('/users', async (req, res) => {
-  const { name, email } = req.body;
-  const result = await pool.query(
-    'INSERT INTO users (name, email) VALUES ($1, $2) RETURNING *',
-    [name, email]
-  );
-  res.status(201).json(result.rows[0]);
+  try {
+    const { name, email } = req.body;
+    const result = await pool.query(
+      'INSERT INTO users (name, email) VALUES ($1, $2) RETURNING *',
+      [name, email]
+    );
+    res.status(201).json(result.rows[0]);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 });
-

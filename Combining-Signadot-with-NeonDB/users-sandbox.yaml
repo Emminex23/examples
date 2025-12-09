@@ -13,8 +13,7 @@ spec:
       params:
         project-id: "@{neon-project-id}"
         parent-branch: "main"
-        database-name: "appdb"
-        namespace: "default"
+        database-name: "neondb"
 
   forks:
     - forkOf:
