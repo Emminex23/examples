@@ -1,0 +1,56 @@
+# * Dependencies (will be installed in container)
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# * Environment files
+.env
+.env.local
+.env.*.local
+
+# * Logs
+*.log
+logs/
+
+# * Git files
+.git/
+.gitignore
+.gitattributes
+
+# * IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# * OS files
+.DS_Store
+Thumbs.db
+
+# * Documentation
+README.md
+*.md
+
+# * Test files
+test/
+tests/
+*.test.js
+*.spec.js
+
+# * Docker files (avoid recursive copying)
+Dockerfile*
+.dockerignore
+docker-compose*.yml
+
+# * CI/CD files
+.github/
+.gitlab-ci.yml
+.travis.yml
+
+# * Build artifacts
+dist/
+build/
+*.map
+

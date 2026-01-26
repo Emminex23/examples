@@ -1,0 +1,167 @@
+name: Build and Push Backend Image
+
+on:
+  pull_request:
+    branches:
+      - main
+      - master
+  push:
+    branches:
+      - main
+      - master
+
+env:
+  # Docker image configuration
+  IMAGE_NAME: vercel-signadot-backend
+  # Docker registry (e.g., docker.io, ghcr.io, gcr.io)
+  # Must be set as REGISTRY secret in GitHub
+  REGISTRY: ${{ secrets.REGISTRY }}
+  IMAGE_TAG: ${{ github.sha }}
+
+jobs:
+  build-and-push:
+    name: Build and Push Docker Image
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    env:
+      DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to container registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ env.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Sanitize branch name for Docker tags
+        id: branch
+        run: |
+          # Sanitize branch name for Docker tag compatibility
+          # Docker tags cannot start with hyphens, periods, or contain invalid characters
+          BRANCH_NAME="${{ github.head_ref || github.ref_name }}"
+          
+          # Sanitize: remove invalid chars, normalize case, ensure valid start
+          SANITIZED_BRANCH=$(echo "${BRANCH_NAME}" | sed 's/[^a-zA-Z0-9._-]/-/g' | sed 's/^[-.]*//' | sed 's/[-.]*$//' | tr '[:upper:]' '[:lower:]')
+          
+          # Ensure valid format: prefix if starts with invalid char, fallback if empty, limit length
+          [[ "${SANITIZED_BRANCH}" =~ ^[-.] ]] && SANITIZED_BRANCH="branch-${SANITIZED_BRANCH}"
+          [ -z "${SANITIZED_BRANCH}" ] && SANITIZED_BRANCH="pr"
+          SANITIZED_BRANCH="${SANITIZED_BRANCH:0:50}"
+          
+          echo "BRANCH=${SANITIZED_BRANCH}" >> $GITHUB_OUTPUT
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.DOCKERHUB_USERNAME }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=sha,prefix=${{ steps.branch.outputs.BRANCH }}-
+            type=sha,format=short
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./Dockerfile
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+
+  deploy-to-eks:
+    name: Deploy to EKS
+    runs-on: ubuntu-latest
+    needs: build-and-push
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
+    permissions:
+      contents: read
+    env:
+      DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Configure kubectl for EKS
+        run: |
+          aws eks update-kubeconfig \
+            --name ${{ secrets.AWS_EKS_CLUSTER_NAME }} \
+            --region ${{ secrets.AWS_REGION }}
+
+      - name: Install Signadot Operator (optional)
+        env:
+          SIGNADOT_CLUSTER_TOKEN: ${{ secrets.SIGNADOT_CLUSTER_TOKEN }}
+        run: |
+          if [ -z "${SIGNADOT_CLUSTER_TOKEN}" ]; then
+            echo "::notice::SIGNADOT_CLUSTER_TOKEN not provided, skipping operator installation"
+            echo "::notice::To install Signadot Operator:"
+            echo "::notice::1. Get cluster token from Signadot dashboard"
+            echo "::notice::2. Add it as SIGNADOT_CLUSTER_TOKEN secret"
+            echo "::notice::3. Or install manually: https://www.signadot.com/docs/getting-started/installation/install-signadot-operator"
+            exit 0
+          fi
+          
+          echo "::notice::Installing Signadot Operator..."
+          
+          if ! command -v helm &> /dev/null; then
+            echo "::notice::Installing Helm..."
+            curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
+          fi
+          
+          kubectl create namespace signadot --dry-run=client -o yaml | kubectl apply -f -
+          
+          kubectl create secret generic cluster-agent \
+            --from-literal=token="${SIGNADOT_CLUSTER_TOKEN}" \
+            -n signadot \
+            --dry-run=client -o yaml | kubectl apply -f -
+          
+          helm repo add signadot https://charts.signadot.com || helm repo update signadot
+          helm repo update
+          
+          helm upgrade --install signadot-operator signadot/operator \
+            --namespace signadot \
+            --wait \
+            --timeout 5m
+          
+          echo "::notice::Signadot Operator installation complete"
+          echo "::notice::Verify cluster connection in Signadot dashboard"
+
+      - name: Update deployment with new image
+        run: |
+          IMAGE_REF="${{ env.REGISTRY }}/${{ env.DOCKERHUB_USERNAME }}/${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }}"
+          
+          sed -i "s|image:.*|image: ${IMAGE_REF}|g" k8s/deployment.yaml
+          kubectl apply -f k8s/deployment.yaml -n default
+          kubectl set image deployment/vercel-signadot-backend \
+            backend="${IMAGE_REF}" \
+            -n default
+
+      - name: Verify deployment
+        run: |
+          kubectl rollout status deployment/vercel-signadot-backend -n default --timeout=5m || {
+            echo "::error::Deployment failed to become ready"
+            kubectl describe deployment/vercel-signadot-backend -n default
+            kubectl logs -l app=vercel-signadot-backend -n default --tail=50
+            exit 1
+          }
+

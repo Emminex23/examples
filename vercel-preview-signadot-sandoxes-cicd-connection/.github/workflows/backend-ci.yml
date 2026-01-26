@@ -1,0 +1,101 @@
+# CI/CD Pipeline for building and pushing Docker images
+# Builds image on PR and provides image ref for Signadot sandboxes
+name: Build and Push Backend Image
+
+on:
+  pull_request:
+    branches:
+      - main
+      - master
+  push:
+    branches:
+      - main
+      - master
+
+env:
+  # Docker image configuration
+  IMAGE_NAME: vercel-signadot-backend
+  # Docker registry (e.g., docker.io, ghcr.io, gcr.io)
+  # Must be set as REGISTRY secret in GitHub
+  REGISTRY: ${{ secrets.REGISTRY }}
+
+jobs:
+  build-and-push:
+    name: Build and Push Docker Image
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    env:
+      DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to container registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ env.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Sanitize branch name for Docker tags
+        id: branch
+        run: |
+          # Sanitize branch name for Docker tag compatibility
+          # Docker tags cannot start with hyphens, periods, or contain invalid characters
+          BRANCH_NAME="${{ github.head_ref || github.ref_name }}"
+          
+          # Remove leading/trailing hyphens and periods, replace invalid chars
+          SANITIZED_BRANCH=$(echo "${BRANCH_NAME}" | sed 's/[^a-zA-Z0-9._-]/-/g' | sed 's/^[-.]*//' | sed 's/[-.]*$//' | tr '[:upper:]' '[:lower:]')
+          
+          # Ensure it doesn't start with hyphen or period
+          if [[ "${SANITIZED_BRANCH}" =~ ^[-.] ]]; then
+            SANITIZED_BRANCH="branch-${SANITIZED_BRANCH}"
+          fi
+          
+          # Fallback if empty or too short
+          if [ -z "${SANITIZED_BRANCH}" ] || [ "${#SANITIZED_BRANCH}" -lt 1 ]; then
+            SANITIZED_BRANCH="pr"
+          fi
+          
+          # Limit length to avoid exceeding Docker tag limits
+          SANITIZED_BRANCH="${SANITIZED_BRANCH:0:50}"
+          
+          echo "BRANCH=${SANITIZED_BRANCH}" >> $GITHUB_OUTPUT
+          echo "::notice::Original branch: ${BRANCH_NAME}"
+          echo "::notice::Sanitized branch: ${SANITIZED_BRANCH}"
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.DOCKERHUB_USERNAME }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=sha,prefix=${{ steps.branch.outputs.BRANCH }}-
+            type=sha,format=short
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./Dockerfile
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Output image reference
+        id: image-ref
+        run: |
+          IMAGE_REF="$(echo '${{ steps.meta.outputs.tags }}' | head -n1)"
+          echo "IMAGE_REF=${IMAGE_REF}" >> "$GITHUB_OUTPUT"
+          echo "::notice::Docker image built: ${IMAGE_REF}"
+          echo "::notice::Use this image reference in your Signadot sandbox action"
+
