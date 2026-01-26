@@ -355,14 +355,16 @@ Before proceeding, ensure you have:
 
 Add the Signadot MCP server to Cursor by editing your `~/.cursor/mcp.json` file:
 
-`{
+```json title="~/.cursor/mcp.json"
+{
   "mcpServers": {
     "signadot": {
       "command": "signadot",
       "args": ["mcp"]
     }
   }
-}`
+}
+```
 
 After adding the configuration, restart Cursor to activate the Signadot MCP server.
 
