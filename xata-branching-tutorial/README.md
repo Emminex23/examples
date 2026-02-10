@@ -71,7 +71,7 @@ Xata requires initial database creation through the dashboard. Once that exists,
 Clone the example repository:
 
 ```bash
-git clone https://github.com/signadot/xata-branching-tutorial.git
+git clone https://github.com/signadot/examples.git
 cd xata-branching-tutorial
 ```
 
