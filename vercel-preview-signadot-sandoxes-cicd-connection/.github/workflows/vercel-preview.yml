@@ -1,0 +1,190 @@
+# Full-Stack Preview Deployment with Vercel + Signadot
+# Creates Signadot sandbox for backend and deploys frontend to Vercel with sandbox URL
+# Comments both preview URLs on the PR
+name: Deploy Full-Stack Preview
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+  workflow_dispatch: {}
+
+jobs:
+  deploy-preview:
+    name: Deploy Full-Stack Preview Environment
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+      id-token: write
+    env:
+      DOCKER_REGISTRY: docker.io
+      DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+      IMAGE_NAME: vercel-signadot-backend
+
+    steps:
+      - name: Checkout Frontend Code
+        uses: actions/checkout@v4
+
+      - name: Checkout Backend Code
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ secrets.BACKEND_REPO }}
+          path: backend
+          token: ${{ secrets.GH_PAT }}
+          ref: main
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Configure kubectl for EKS
+        run: |
+          aws eks update-kubeconfig \
+            --name ${{ secrets.AWS_EKS_CLUSTER_NAME }} \
+            --region ${{ secrets.AWS_REGION }}
+          kubectl get nodes
+
+      - name: Install Signadot CLI
+        run: |
+          curl -sSLf https://raw.githubusercontent.com/signadot/cli/main/scripts/install.sh | sh
+          echo "$HOME/.signadot/bin" >> "$GITHUB_PATH"
+
+      - name: Configure Signadot credentials
+        env:
+          SIGNADOT_ORG: ${{ secrets.SIGNADOT_ORG }}
+          SIGNADOT_API_KEY: ${{ secrets.SIGNADOT_API_KEY }}
+        run: |
+          mkdir -p "$HOME/.signadot"
+          {
+            echo "org: ${SIGNADOT_ORG}"
+            echo "api_key: ${SIGNADOT_API_KEY}"
+          } > "$HOME/.signadot/config.yaml"
+
+      - name: Verify Signadot Operator
+        run: |
+          # Signadot Operator should be pre-installed on the cluster
+          # This step verifies the operator is running
+          if ! kubectl get namespace signadot &>/dev/null; then
+            echo "::error::Signadot namespace not found. Please install the Signadot Operator first."
+            echo "::notice::Installation guide: https://www.signadot.com/docs/getting-started/installation/install-signadot-operator"
+            exit 1
+          fi
+          
+          echo "::notice::Checking Signadot Operator status..."
+          kubectl wait --for=condition=ready pod -l app.kubernetes.io/name=signadot-operator -n signadot --timeout=30s || {
+            echo "::warning::Signadot Operator may not be ready, but continuing..."
+            kubectl get pods -n signadot || true
+          }
+
+      - name: Get Backend Image Reference
+        id: backend-image
+        run: |
+          DOCKERHUB_USERNAME="${{ env.DOCKERHUB_USERNAME }}"
+          IMAGE_NAME="${{ env.IMAGE_NAME }}"
+          IMAGE_TAG="latest"
+          IMAGE_REF="${{ env.DOCKER_REGISTRY }}/${DOCKERHUB_USERNAME}/${IMAGE_NAME}:${IMAGE_TAG}"
+          echo "IMAGE_REF=${IMAGE_REF}" >> $GITHUB_OUTPUT
+          echo "SANDBOX_IMAGE_TAG=${IMAGE_TAG}" >> $GITHUB_OUTPUT
+
+      - name: Prepare Sandbox Configuration
+        run: |
+          IMAGE_REF="${{ steps.backend-image.outputs.IMAGE_REF }}"
+          SANDBOX_IMAGE_TAG="${{ steps.backend-image.outputs.SANDBOX_IMAGE_TAG }}"
+          DOCKERHUB_USERNAME="${{ env.DOCKERHUB_USERNAME }}"
+          CLUSTER_NAME="${{ secrets.AWS_EKS_CLUSTER_NAME }}"
+          NAMESPACE="default"
+          
+          # Replace image placeholder
+          sed -i "s|image: docker.io/DOCKERHUB_USERNAME/vercel-signadot-backend:SANDBOX_IMAGE_TAG|image: ${IMAGE_REF}|g" backend/sandbox.yaml
+          
+          # Replace cluster name placeholder
+          sed -i "s|cluster: CLUSTER_NAME|cluster: ${CLUSTER_NAME}|g" backend/sandbox.yaml
+          
+          # Replace namespace placeholders
+          sed -i "s|namespace: NAMESPACE|namespace: ${NAMESPACE}|g" backend/sandbox.yaml
+          sed -i "s|NAMESPACE|${NAMESPACE}|g" backend/sandbox.yaml
+          
+          # Update sandbox name with PR number
+          if [ -n "${{ github.event.pull_request.number }}" ]; then
+            PR_NUM="${{ github.event.pull_request.number }}"
+            SANDBOX_NAME="backend-pr-${PR_NUM}"
+            # Replace first name: field (sandbox name, not deployment name)
+            sed -i "0,/^name:/s/^name:.*/name: ${SANDBOX_NAME}/" backend/sandbox.yaml
+          else
+            # Replace PR_NUMBER placeholder for non-PR events
+            sed -i "s|name: backend-pr-PR_NUMBER|name: backend-main-${GITHUB_SHA:0:7}|g" backend/sandbox.yaml
+          fi
+
+      - name: Create Signadot Sandbox
+        id: sandbox
+        run: |
+          set -e
+          
+          if [ -n "${{ github.event.pull_request.number }}" ]; then
+            PR_NUM="${{ github.event.pull_request.number }}"
+            SANDBOX_NAME="backend-pr-${PR_NUM}"
+          else
+            SANDBOX_NAME="backend-main-${GITHUB_SHA:0:7}"
+          fi
+          
+          SANDBOX_OUTPUT=$(signadot sandbox apply -f backend/sandbox.yaml)
+          echo "$SANDBOX_OUTPUT"
+          
+          # Extract sandbox URL using JSON output
+          sleep 5
+          SANDBOX_JSON=$(signadot sandbox get "${SANDBOX_NAME}" -o json 2>/dev/null || echo "")
+          if [ -n "$SANDBOX_JSON" ]; then
+            if command -v jq &> /dev/null; then
+              SANDBOX_URL=$(echo "$SANDBOX_JSON" | jq -r '.endpoints[]? | select(.name=="backend-api") | .url' | head -n1)
+            fi
+          fi
+          
+          # Fallback: extract from text output
+          if [ -z "$SANDBOX_URL" ]; then
+            SANDBOX_URL=$(echo "$SANDBOX_OUTPUT" | grep -oE 'https://[^[:space:]]+\.(preview|sb)\.signadot\.com' | head -n1)
+          fi
+          
+          if [ -z "$SANDBOX_URL" ]; then
+            echo "::error::Failed to extract sandbox URL"
+            exit 1
+          fi
+          
+          echo "sandbox-url=$SANDBOX_URL" >> "$GITHUB_OUTPUT"
+          echo "sandbox-name=${SANDBOX_NAME}" >> "$GITHUB_OUTPUT"
+
+      - name: Deploy to Vercel with Sandbox URL
+        id: vercel
+        uses: amondnet/vercel-action@v25
+        with:
+          vercel-token: ${{ secrets.VERCEL_TOKEN }}
+          vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
+          vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID }}
+          working-directory: .
+          vercel-args: '--build-env NEXT_PUBLIC_API_URL=${{ steps.sandbox.outputs.sandbox-url }} --env SIGNADOT_API_KEY=${{ secrets.SIGNADOT_API_KEY }} --force'
+        env:
+          NEXT_PUBLIC_API_URL: ${{ steps.sandbox.outputs.sandbox-url }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+
+      - name: Comment Preview URLs on PR
+        if: github.event.pull_request.number != null
+        uses: actions/github-script@v7
+        with:
+          script: |
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: `## 🚀 Full-Stack Preview Deployed!
+              
+              Your preview environment is ready for testing:
+              
+              - **Frontend Preview:** ${{ steps.vercel.outputs.preview-url }}
+              - **Backend Sandbox:** ${{ steps.sandbox.outputs.sandbox-url }}
+              
+              The frontend is automatically configured to use the backend sandbox URL.`
+            });
+
