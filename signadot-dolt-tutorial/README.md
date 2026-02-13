@@ -33,11 +33,11 @@ The end-to-end system works as follows:
 config:
   theme: default
   flowchart:
-    nodeSpacing: 10
-    rankSpacing: 20
-    padding: 7
+    nodeSpacing: 50
+    rankSpacing: 100
+    padding: 12
   themeVariables:
-    fontSize: 11px
+    fontSize: 14px
     fontFamily: monospace
 ---
 
