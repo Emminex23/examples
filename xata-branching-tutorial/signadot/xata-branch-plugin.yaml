@@ -1,0 +1,134 @@
+name: xata-branch
+spec:
+  description: Creates and deletes Xata database branches for sandbox isolation
+
+  runner:
+    image: debian:bookworm-slim
+    namespace: signadot
+    podTemplateOverlay: |
+      spec:
+        containers:
+          - name: runner
+            env:
+              - name: XATA_API_KEY
+                valueFrom:
+                  secretKeyRef:
+                    name: xata-credentials
+                    key: XATA_API_KEY
+              - name: XATA_ORG_ID
+                valueFrom:
+                  secretKeyRef:
+                    name: xata-credentials
+                    key: XATA_ORG_ID
+              - name: XATA_PROJECT_ID
+                valueFrom:
+                  secretKeyRef:
+                    name: xata-credentials
+                    key: XATA_PROJECT_ID
+              - name: XATA_DATABASE_NAME
+                valueFrom:
+                  secretKeyRef:
+                    name: xata-credentials
+                    key: XATA_DATABASE_NAME
+
+  create:
+    - name: provision
+      inputs:
+        - name: parent-branch
+          valueFromSandbox: true
+          as:
+            env: PARENT_BRANCH
+
+      script: |
+        #!/bin/bash
+        set -e
+
+        BRANCH_NAME="sb-${SIGNADOT_SANDBOX_NAME}"
+        PARENT="${PARENT_BRANCH:-main}"
+
+        echo "=== Xata Branch CREATE ==="
+        echo "Branch: ${BRANCH_NAME}"
+        echo "Parent: ${PARENT}"
+
+        # Install dependencies
+        apt-get update > /dev/null 2>&1
+        apt-get install -y curl jq libdigest-sha-perl > /dev/null 2>&1
+
+        # Install Xata CLI using official installer
+        echo "Installing Xata CLI..."
+        curl -fsSL https://xata.io/install.sh | bash > /dev/null 2>&1
+        export PATH="$HOME/.config/xata/bin:$PATH"
+        echo "CLI installed: $(xata --version)"
+
+        # Get parent branch ID
+        echo "Looking up parent branch..."
+        PARENT_ID=$(xata branch list --organization "${XATA_ORG_ID}" --project "${XATA_PROJECT_ID}" --json | \
+          jq -r ".[] | select(.name == \"${PARENT}\") | .id")
+        echo "Parent ID: ${PARENT_ID}"
+
+        # Create branch
+        echo "Creating branch..."
+        xata branch create \
+          --organization "${XATA_ORG_ID}" \
+          --project "${XATA_PROJECT_ID}" \
+          --name "${BRANCH_NAME}" \
+          --parent-branch "${PARENT_ID}"
+
+        # Wait for branch to be ready
+        echo "Waiting for branch to be ready..."
+        xata branch wait-ready \
+          --organization "${XATA_ORG_ID}" \
+          --project "${XATA_PROJECT_ID}" \
+          "${BRANCH_NAME}"
+
+        # Get connection string
+        echo "Getting connection string..."
+        CONNECTION_STRING=$(xata branch url \
+          --organization "${XATA_ORG_ID}" \
+          --project "${XATA_PROJECT_ID}" \
+          --database "${XATA_DATABASE_NAME}" \
+          "${BRANCH_NAME}")
+
+        echo "Connection: ${CONNECTION_STRING}"
+
+        # Write outputs
+        mkdir -p /outputs
+        echo -n "${BRANCH_NAME}" > /outputs/branch-name
+        echo -n "${CONNECTION_STRING}" > /outputs/connection-string
+
+        echo "=== Branch creation complete ==="
+
+      outputs:
+        - name: branch-name
+          valueFromPath: /outputs/branch-name
+        - name: connection-string
+          valueFromPath: /outputs/connection-string
+
+  delete:
+    - name: cleanup
+      script: |
+        #!/bin/bash
+        set -e
+
+        BRANCH_NAME="sb-${SIGNADOT_SANDBOX_NAME}"
+
+        echo "=== Xata Branch DELETE ==="
+        echo "Branch: ${BRANCH_NAME}"
+
+        # Install dependencies
+        apt-get update > /dev/null 2>&1
+        apt-get install -y curl libdigest-sha-perl > /dev/null 2>&1
+
+        # Install Xata CLI
+        echo "Installing Xata CLI..."
+        curl -fsSL https://xata.io/install.sh | bash > /dev/null 2>&1
+        export PATH="$HOME/.config/xata/bin:$PATH"
+
+        # Delete branch
+        echo "Deleting branch..."
+        xata branch delete \
+          --organization "${XATA_ORG_ID}" \
+          --project "${XATA_PROJECT_ID}" \
+          "${BRANCH_NAME}" --yes || echo "Branch may not exist"
+
+        echo "=== Branch deletion complete ==="
